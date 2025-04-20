@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Snake Game - Retro Edition</title>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Press Start 2P', cursive;
+      background: radial-gradient(circle, #3e065f, #1e1e2f);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      color: #00ff99;
+      overflow: hidden;
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      color: #ff00cc;
+      margin-bottom: 20px;
+      text-shadow: 2px 2px 4px #000;
+    }
+
+    #gameCanvas {
+      background-color: #1e1e2f;
+      border: 6px solid #00ff99;
+      box-shadow: 0 0 30px #00ff99;
+      image-rendering: pixelated;
+    }
+
+    .scoreboard {
+      font-size: 1rem;
+      margin-top: 15px;
+      color: #fffb00;
+    }
+
+    .retro-glow {
+      text-shadow: 0 0 5px #00ff99, 0 0 10px #00ff99, 0 0 20px #00ff99;
+    }
+
+    .scanlines::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: repeating-linear-gradient(
+        to bottom,
+        rgba(0, 0, 0, 0.2),
+        rgba(0, 0, 0, 0.2) 2px,
+        transparent 2px,
+        transparent 4px
+      );
+      pointer-events: none;
+      z-index: 999;
+    }
+
+    #playButton {
+      margin-top: 20px;
+      padding: 10px 20px;
+      font-size: 1rem;
+      font-family: 'Press Start 2P', cursive;
+      color: #fff;
+      background: #8000ff;
+      border: none;
+      border-radius: 8px;
+      box-shadow: 0 0 10px #8000ff;
+      cursor: pointer;
+      z-index: 1;
+    }
+    #playButton:hover {
+      background: #a34eff;
+    }
+
+    #startScreen {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.85);
+      color: #ff00cc;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 10;
+    }
+
+    #insertCoin {
+      font-size: 1.2rem;
+      animation: blink 1s infinite;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0; }
+    }
+  </style>
+</head>
+<body class="scanlines">
+  <div id="startScreen">
+    <h1 class="retro-glow">🎮 Retro Snake Game</h1>
+    <div id="insertCoin">▶ INSERT COIN</div>
+    <button id="playButton">▶ Play</button>
+  </div>
+  <canvas id="gameCanvas" width="400" height="400"></canvas>
+  <div class="scoreboard">Score: <span id="score">0</span></div>
+  <audio id="eatSound" src="https://www.soundjay.com/button/sounds/button-4.mp3" preload="auto"></audio>
+  <audio id="gameOverSound" src="https://www.soundjay.com/button/sounds/button-10.mp3" preload="auto"></audio>
+  <script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const scoreEl = document.getElementById('score');
+    const playButton = document.getElementById('playButton');
+    const eatSound = document.getElementById('eatSound');
+    const gameOverSound = document.getElementById('gameOverSound');
+    const startScreen = document.getElementById('startScreen');
+
+    const gridSize = 20;
+    const tileCount = canvas.width / gridSize;
+
+    let snake;
+    let direction;
+    let food;
+    let score;
+    let interval;
+
+    playButton.addEventListener('click', () => {
+      startScreen.style.display = 'none';
+      startGame();
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (!interval) return;
+      switch (e.key) {
+        case 'ArrowUp':
+          if (direction.y === 0) direction = { x: 0, y: -1 };
+          break;
+        case 'ArrowDown':
+          if (direction.y === 0) direction = { x: 0, y: 1 };
+          break;
+        case 'ArrowLeft':
+          if (direction.x === 0) direction = { x: -1, y: 0 };
+          break;
+        case 'ArrowRight':
+          if (direction.x === 0) direction = { x: 1, y: 0 };
+          break;
+      }
+    });
+
+    function startGame() {
+      snake = [{ x: 10, y: 10 }];
+      direction = { x: 1, y: 0 };
+      food = getRandomFood();
+      score = 0;
+      scoreEl.textContent = score;
+      clearInterval(interval);
+      interval = setInterval(gameLoop, 150);
+    }
+
+    function gameLoop() {
+      const head = { ...snake[0] };
+      head.x += direction.x;
+      head.y += direction.y;
+
+      if (
+        head.x < 0 || head.x >= tileCount ||
+        head.y < 0 || head.y >= tileCount ||
+        snake.some(s => s.x === head.x && s.y === head.y)
+      ) {
+        clearInterval(interval);
+        interval = null;
+        gameOverSound.play();
+        alert('💀 Game Over! Score: ' + score);
+        return;
+      }
+
+      snake.unshift(head);
+
+      if (head.x === food.x && head.y === food.y) {
+        food = getRandomFood();
+        score++;
+        scoreEl.textContent = score;
+        eatSound.play();
+      } else {
+        snake.pop();
+      }
+
+      draw();
+    }
+
+    function draw() {
+      ctx.fillStyle = '#1e1e2f';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      ctx.fillStyle = '#00ff99';
+      for (const segment of snake) {
+        ctx.fillRect(segment.x * gridSize, segment.y * gridSize, gridSize - 2, gridSize - 2);
+      }
+
+      ctx.fillStyle = '#ff00cc';
+      ctx.fillRect(food.x * gridSize, food.y * gridSize, gridSize - 2, gridSize - 2);
+    }
+
+    function getRandomFood() {
+      return {
+        x: Math.floor(Math.random() * tileCount),
+        y: Math.floor(Math.random() * tileCount)
+      };
+    }
+  </script>
+</body>
+</html>
